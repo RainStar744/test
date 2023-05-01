@@ -1,0 +1,90 @@
+name: PixelExperience
+
+on:
+
+  push:
+
+    branches:
+
+      - eleven
+
+  workflow_dispatch:
+
+jobs:
+
+  build:
+
+    runs-on: ubuntu-18.04
+
+    timeout-minutes: 99999
+
+    strategy:
+
+      matrix:
+
+        device:
+
+          - redfin
+
+        variant:
+
+          - userdebug
+
+    steps:
+
+      - uses: actions/checkout@v2
+
+      - name: Install Dependencies
+
+        run: sudo apt-get update && sudo apt-get install -y bc bison build-essential ccache curl flex g++-multilib gcc-multilib gnupg gperf imagemagick lib32ncurses5-dev lib32readline-dev lib32z1-dev liblz4-tool libncurses5-dev libsdl1.2-dev libssl-dev libxml2 libxml2-utils lzop pngcrush python python3 rsync schedtool squashfs-tools xsltproc zip zlib1g-dev python3-pip python3-setuptools python3-wheel python-is-python3 git
+
+      - name: Setup Environment
+
+        run: export ALLOW_MISSING_DEPENDENCIES=true && export USE_CCACHE=1 && export CCACHE_COMPRESS=1 && export CCACHE_COMPRESSLEVEL=6 && export CCACHE_MAXSIZE=50G && export LC_ALL=C && export SKIP_API_CHECK=true
+
+      - name: Prepare Build Environment
+
+        run: |
+
+          git clone https://github.com/akhilnarang/scripts.git scripts
+
+          cd scripts && bash setup/android_build_env.sh && cd ..
+
+      - name: Download PixelExperience Source Code
+
+        run: |
+
+          mkdir pe
+
+          cd pe
+
+          repo init -u https://github.com/PixelExperience/manifest -b eleven
+
+          repo sync -c -j$(nproc --all) --force-sync --no-clone-bundle --no-tags
+
+          git clone https://github.com/PixelExperience-Devices/device_google_redfin.git device/google/redfin
+
+          git clone https://github.com/PixelExperience-Devices/vendor_google.git vendor/google
+
+          git clone https://github.com/ArrowOS-Devices/kernel_google_redbull.git kernel/google/redbull
+
+      - name: Build PixelExperience ROM
+
+        run: |
+
+          source build/envsetup.sh
+
+          lunch ${variant}-${device}
+
+          make bacon -j$(nproc --all)
+
+      - name: Upload Artifacts
+
+        uses: actions/upload-artifact@v2
+
+        with:
+
+          name: PixelExperience
+
+          path: out/target/product/redfin/*
+
